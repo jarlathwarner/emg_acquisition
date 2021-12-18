@@ -1,0 +1,113 @@
+import threading
+
+import serial
+
+from src.packet import Packet
+from src.packet import multichr
+from src.utilities import pack
+
+class BT(object):
+    """
+    Link for MYO ble basics: https://github.com/thalmiclabs/myo-bluetooth/blob/master/myohw.h
+    """
+    def __init__(self, usb_port):
+        self.ser = serial.Serial(port=usb_port, baudrate=9600, dsrdtr=1)
+        self.buf = []
+        self.lock = threading.Lock()
+        self.handlers = []
+        self.packet_len = None
+
+    # bluetooth low energy (BLE) commands
+    def send_command(self, cls, cmd, payload=b''):
+        s = pack('4B', 0, len(payload), cls, cmd) + payload
+        self.ser.write(s)
+
+        while True:
+            p = self.recv_packet()
+            # no timeout, so p won't be None
+            if p.typ == 0:
+                return p
+            # not a response: must be an event
+            self.handle_event(p)
+
+    def discover(self):
+        return self.send_command(6, 2, b'\x01')
+
+    def connect(self, addr):
+        return self.send_command(6, 3, pack('6sBHHHH', multichr(addr), 0, 6, 6, 64, 0))
+
+    def disconnect(self, h):
+        return self.send_command(3, 0, pack('B', h))
+
+    def recv_packet(self):
+        n = self.ser.inWaiting()  # Windows fix
+        while True:
+            c = self.ser.read()
+            if not c:
+                return None
+
+            ret = self.proc_byte(ord(c))
+            if ret:
+                if ret.typ == 0x80:
+                    self.handle_event(ret)
+                    # Windows fix
+                    if n >= 5096:
+                        print("Clearning", n)
+                        self.ser.flushInput()
+                # End of Windows fix
+                return ret
+
+    def proc_byte(self, c):
+        if not self.buf:
+            if c in [0x00, 0x80, 0x08, 0x88]:  # [BLE response pkt, BLE event pkt, wifi response pkt, wifi event pkt]
+                self.buf.append(c)
+            return None
+        elif len(self.buf) == 1:
+            self.buf.append(c)
+            self.packet_len = 4 + (self.buf[0] & 0x07) + self.buf[1]
+            return None
+        else:
+            self.buf.append(c)
+
+        if self.packet_len and len(self.buf) == self.packet_len:
+            p = Packet(self.buf)
+            self.buf = []
+            return p
+        return None
+
+    def handle_event(self, p):
+        for h in self.handlers:
+            h(p)
+
+    def end_scan(self):
+        return self.send_command(6, 4)
+
+    def read_attr(self, con, attr):
+        self.send_command(4, 4, pack('BH', con, attr))
+        return self.wait_event(4, 5)
+
+    def write_attr(self, con, attr, val):
+        self.send_command(4, 5, pack('BHB', con, attr, len(val)) + val)
+        return self.wait_event(4, 1)
+
+    def add_handler(self, h):
+        self.handlers.append(h)
+
+    def remove_handler(self, h):
+        try:
+            self.handlers.remove(h)
+        except ValueError:
+            pass
+
+    def wait_event(self, cls, cmd):
+        res = [None]
+
+        def h(p):
+            if p.cls == cls and p.cmd == cmd:
+                res[0] = p
+
+        self.add_handler(h)
+        while res[0] is None:
+            self.recv_packet()
+        self.remove_handler(h)
+        return res[0]
