@@ -12,3 +12,6 @@ def pack(fmt, *args):
     """
     # < means little endian
     return struct.pack('<' + fmt, *args)
+
+def unpack(fmt, *args):
+    return struct.unpack('<' + fmt, *args)

@@ -1,11 +1,11 @@
 import re
-from struct import unpack
+from utilities import unpack
 
 from serial.tools.list_ports_linux import comports
 
-from src.Bt import BT
-from src.packet import multiord
-from src.utilities import pack
+from Bt import BT
+from packet import multiord
+from utilities import pack
 
 class Myo(object):
     def __init__(self, mode=1):

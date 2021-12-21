@@ -4,10 +4,10 @@ import time
 import pandas as pd
 import pygame
 
-from src.modes import EMGMode
-from src.myo import Myo
+from modes import EMGMode
+from myo import Myo
 
-SECONDS = 10
+SECONDS = 2
 w, h = 800, 600
 q = multiprocessing.Queue()
 
@@ -61,6 +61,7 @@ if __name__ == '__main__':
     """
     myo = Myo(mode=EMGMode.PREPROCESSED)
     myo.connect()
+    print("Connected to MYO")
 
     myo_data = []
 
@@ -76,11 +77,13 @@ if __name__ == '__main__':
 
     # Its go time
     myo.set_leds([0, 128, 0], [0, 128, 0])
+
     # Vibrate to know we connected okay
     myo.vibrate(1)
 
     print("Data Worker started to collect")
-    # Start collecing data.
+
+    # Start collecting data.
     start_time = time.time()
 
     while True:
@@ -97,7 +100,6 @@ if __name__ == '__main__':
             myo_cols = ["Channel_1", "Channel_2", "Channel_3", "Channel_4", "Channel_5", "Channel_6", "Channel_7",
                         "Channel_8"]
             myo_df = pd.DataFrame(myo_data, columns=myo_cols)
-            plot_emg()
 
             # myo_df.to_csv(filepath, index=False)
             # print("CSV Saved at: ", filepath)

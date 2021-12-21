@@ -2,9 +2,9 @@ import threading
 
 import serial
 
-from src.packet import Packet
-from src.packet import multichr
-from src.utilities import pack
+from packet import Packet
+from packet import multichr
+from utilities import pack
 
 class BT(object):
     """
@@ -41,6 +41,7 @@ class BT(object):
 
     def recv_packet(self):
         n = self.ser.inWaiting()  # Windows fix
+
         while True:
             c = self.ser.read()
             if not c:
@@ -52,8 +53,9 @@ class BT(object):
                     self.handle_event(ret)
                     # Windows fix
                     if n >= 5096:
-                        print("Clearning", n)
+                        print("Cleaning", n)
                         self.ser.flushInput()
+
                 # End of Windows fix
                 return ret
 
