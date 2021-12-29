@@ -97,3 +97,10 @@ class Myo(object):
     def disconnect(self):
         if self.conn is not None:
             self.bt.disconnect(self.conn)
+
+    def power_off(self):
+        '''
+        function to power off the Myo Armband (actually, according to the official BLE specification,
+        the 0x04 command puts the Myo into deep sleep, there is no way to completely turn the device off).
+        '''
+        self.write_attr(0x19, b'\x04\x00')
