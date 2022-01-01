@@ -7,38 +7,15 @@ from packet import multichr
 from utilities import pack
 
 class BT(object):
-    """
-    Link for MYO ble basics: https://github.com/thalmiclabs/myo-bluetooth/blob/master/myohw.h
-    """
-    def __init__(self, usb_port):
-        self.ser = serial.Serial(port=usb_port, baudrate=9600, dsrdtr=1)
+    '''Implements the non-Myo-specific details of the Bluetooth protocol.'''
+
+    def __init__(self, tty):
+        self.ser = serial.Serial(port=tty, baudrate=9600, dsrdtr=1)
         self.buf = []
         self.lock = threading.Lock()
         self.handlers = []
-        self.packet_len = None
 
-    # bluetooth low energy (BLE) commands
-    def send_command(self, cls, cmd, payload=b''):
-        s = pack('4B', 0, len(payload), cls, cmd) + payload
-        self.ser.write(s)
-
-        while True:
-            p = self.recv_packet()
-            # no timeout, so p won't be None
-            if p.typ == 0:
-                return p
-            # not a response: must be an event
-            self.handle_event(p)
-
-    def discover(self):
-        return self.send_command(6, 2, b'\x01')
-
-    def connect(self, addr):
-        return self.send_command(6, 3, pack('6sBHHHH', multichr(addr), 0, 6, 6, 64, 0))
-
-    def disconnect(self, h):
-        return self.send_command(3, 0, pack('B', h))
-
+    # internal data-handling methods
     def recv_packet(self):
         n = self.ser.inWaiting()  # Windows fix
 
@@ -53,9 +30,8 @@ class BT(object):
                     self.handle_event(ret)
                     # Windows fix
                     if n >= 5096:
-                        print("Cleaning", n)
+                        print("Clearning", n)
                         self.ser.flushInput()
-
                 # End of Windows fix
                 return ret
 
@@ -81,17 +57,6 @@ class BT(object):
         for h in self.handlers:
             h(p)
 
-    def end_scan(self):
-        return self.send_command(6, 4)
-
-    def read_attr(self, con, attr):
-        self.send_command(4, 4, pack('BH', con, attr))
-        return self.wait_event(4, 5)
-
-    def write_attr(self, con, attr, val):
-        self.send_command(4, 5, pack('BHB', con, attr, len(val)) + val)
-        return self.wait_event(4, 1)
-
     def add_handler(self, h):
         self.handlers.append(h)
 
@@ -113,3 +78,39 @@ class BT(object):
             self.recv_packet()
         self.remove_handler(h)
         return res[0]
+
+    # specific BLE commands
+    def connect(self, addr):
+        return self.send_command(6, 3, pack('6sBHHHH', multichr(addr), 0, 6, 6, 64, 0))
+
+    def get_connections(self):
+        return self.send_command(0, 6)
+
+    def discover(self):
+        return self.send_command(6, 2, b'\x01')
+
+    def end_scan(self):
+        return self.send_command(6, 4)
+
+    def disconnect(self, h):
+        return self.send_command(3, 0, pack('B', h))
+
+    def read_attr(self, con, attr):
+        self.send_command(4, 4, pack('BH', con, attr))
+        return self.wait_event(4, 5)
+
+    def write_attr(self, con, attr, val):
+        self.send_command(4, 5, pack('BHB', con, attr, len(val)) + val)
+        return self.wait_event(4, 1)
+
+    def send_command(self, cls, cmd, payload=b'', wait_resp=True):
+        s = pack('4B', 0, len(payload), cls, cmd) + payload
+        self.ser.write(s)
+
+        while True:
+            p = self.recv_packet()
+            # no timeout, so p won't be None
+            if p.typ == 0:
+                return p
+            # not a response: must be an event
+            self.handle_event(p)
