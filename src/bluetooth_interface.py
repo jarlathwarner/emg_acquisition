@@ -1,3 +1,6 @@
+"""
+Class to handle code relating to interfacing with the MYO using the bluetooth protocol
+"""
 import threading
 
 import serial
@@ -7,8 +10,9 @@ from packet import multichr
 from utilities import pack
 
 class BT(object):
-    '''Implements the non-Myo-specific details of the Bluetooth protocol.'''
-
+    """
+    Implements the non-Myo-specific details of the Bluetooth protocol.
+    """
     def __init__(self, tty):
         self.ser = serial.Serial(port=tty, baudrate=9600, dsrdtr=1)
         self.buf = []
