@@ -4,12 +4,17 @@ change DRAW_LINES to try each.
 Press Ctrl + C in the terminal to exit
 """
 
-import multiprocessing
 import logging.config
+import multiprocessing
 import pathlib
+
 import pygame
-from pyomyo import Myo
-from pyomyo import emg_mode
+# from pyomyo import Myo
+# from pyomyo import emg_mode
+from myo_interface import Myo
+from myo_interface import emg_mode
+# from myo import Myo
+# from modes import EMGMode
 
 LOGGING_CONF_FILEPATH = pathlib.Path(__file__).parent / 'logging.conf'
 logging.config.fileConfig(LOGGING_CONF_FILEPATH, disable_existing_loggers=True)
@@ -17,12 +22,17 @@ logger = logging.getLogger(__name__)
 
 # ------------ Myo Setup ---------------
 thread_queue = multiprocessing.Queue()
-PLOT_WIDTH = 800
-PLOT_HEIGHT = 600
+PLOT_WIDTH = 1500
+PLOT_HEIGHT = 1200
 
 # -------- Plotting variables ----------
-last_vals = None
+previous_emg_data = None
 DRAW_LINES = True
+
+def power_off_myo():
+    m = Myo(mode=emg_mode.PREPROCESSED)
+    m.power_off()
+    logger.info("MYO device powered off")
 
 def worker(q):
     """
@@ -31,15 +41,16 @@ def worker(q):
     """
     # connect to MYO device
     m = Myo(mode=emg_mode.PREPROCESSED)
+    # m = Myo(mode=EMGMode.PREPROCESSED)
     m.connect()
 
-    def add_to_queue(emg):
+    def add_to_queue(emg, movement):
         q.put(emg)
 
     m.add_emg_handler(add_to_queue)
 
     def print_battery(bat):
-        logger.debug("Battery level:", bat)
+        logger.debug(f"Battery level: {bat}")
 
     m.add_battery_handler(print_battery)
 
@@ -60,15 +71,15 @@ def plot(scr, vals):
     :param scr: display to plot to
     :param vals: values to plot
     """
-    global last_vals
-    if last_vals is None:
-        last_vals = vals
+    global previous_emg_data
+    if previous_emg_data is None:
+        previous_emg_data = vals
         return
 
     D = 5
     scr.scroll(-D)
     scr.fill((0, 0, 0), (PLOT_WIDTH - D, 0, PLOT_WIDTH, PLOT_HEIGHT))
-    for i, (u, v) in enumerate(zip(last_vals, vals)):
+    for i, (u, v) in enumerate(zip(previous_emg_data, vals)):
         if DRAW_LINES:
             pygame.draw.line(scr, (0, 255, 0),
                              (PLOT_WIDTH - D, int(PLOT_HEIGHT / 9 * (i + 1 - u))),
@@ -81,14 +92,9 @@ def plot(scr, vals):
             scr.fill((c, c, c), (PLOT_WIDTH - D, i * PLOT_HEIGHT / 8, D, (i + 1) * PLOT_HEIGHT / 8 - i * PLOT_HEIGHT / 8))
 
     pygame.display.flip()
-    last_vals = vals
+    previous_emg_data = vals
 
-
-# -------- Main program code -----------
-if __name__ == "__main__":
-    thread_process = multiprocessing.Process(target=worker, args=(thread_queue,))
-    thread_process.start()
-
+def display_live_emg():
     scr = pygame.display.set_mode((PLOT_WIDTH, PLOT_HEIGHT))
 
     try:
@@ -104,4 +110,14 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("Exiting")
         pygame.quit()
-        quit()
+
+
+# -------- Main program code -----------
+if __name__ == "__main__":
+    thread_process = multiprocessing.Process(target=worker, args=(thread_queue,))
+    thread_process.start()
+
+    display_live_emg()
+
+    power_off_myo()
+    logger.debug("Exit")
