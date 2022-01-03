@@ -1,5 +1,6 @@
 import logging.config
 import pathlib
+import pickle
 from collections import Counter, deque
 import struct
 import sys
@@ -8,13 +9,19 @@ from pathlib import Path
 
 import pandas as pd
 import pygame
-import sklearn
+import sklearn.preprocessing
 from pygame.locals import *
 import numpy as np
 
 from pyomyo import Myo, emg_mode
 from scipy.signal import butter
 from scipy.signal import filtfilt
+from sklearn import metrics
+from sklearn import svm
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
 
 LOGGING_CONF_FILEPATH = pathlib.Path(__file__).parent / 'logging.conf'
 logging.config.fileConfig(LOGGING_CONF_FILEPATH, disable_existing_loggers=True)
@@ -27,6 +34,7 @@ NUM_GESTURES = 5
 NUM_SAMPLES = 3
 
 OVERWRITE_EXISTING = False
+USE_EXISTING_DATA = True
 SAMPLE_RATE = 200
 
 GESTURE_NAMES = ['REST', 'FIST', 'EXTENDED PALM', 'WRIST FLEXION', 'WRIST EXTENSION']
@@ -34,8 +42,10 @@ EMG_MODE = emg_mode.PREPROCESSED
 
 SAMPLE_DURATION = 3
 
+training_data_dir = Path('data')
+
 def normalise_signal(emg_signal):
-    scalar = sklearn.preprocessing.MinMaxScaler(feature_range=(-1, 1))
+    scalar = MinMaxScaler(feature_range=(-1, 1))
     normalised_signal = scalar.fit_transform(emg_signal)
 
     return normalised_signal
@@ -104,6 +114,38 @@ def collect_data(gesture, training_data_filepath):
             emg_df.to_csv(training_data_filepath, index=False, mode='a')
             logger.info(f"Saved EMG sample for gesture {gesture} at {training_data_filepath}")
 
+def get_training_data():
+    training_data = []
+    training_labels = []
+
+    # read in each gesture file
+    for gesture_num in range(NUM_GESTURES):
+        # determine filepath of gesture training data
+        training_data_filename = Path(f'training_gesture_{gesture_num}.dat')
+        gesture_data_filepath = training_data_dir / training_data_filename
+
+        # read training data file for gesture
+        emg_df = pd.read_csv(gesture_data_filepath, index_col=0)
+        emg_array = emg_df.to_numpy()
+        emg_labels = np.full((len(emg_array)), gesture_num)
+
+        training_data.append(emg_array)
+        training_labels.append(emg_labels)
+
+    training_data_stacked = np.vstack(training_data)
+    training_labels_stacked = np.hstack(training_labels)
+    return training_data_stacked, training_labels_stacked
+
+def save_model(model):
+    model_filename = "trained_model.pkl"
+    with open(model_filename, 'wb') as file:
+        pickle.dump(model, file)
+
+def load_model():
+    model_filename = "trained_model.pkl"
+    with open(model_filename, 'rb') as file:
+        model = pickle.load(file)
+    return model
 
 class Classifier(object):
     """
@@ -115,7 +157,6 @@ class Classifier(object):
         self.color = color
 
         # check if training files have been created
-        training_data_dir = Path('data')
         for gesture_num in range(NUM_GESTURES):
             training_data_filename = Path(f'training_gesture_{gesture_num}.dat')
             training_data_filepath = training_data_dir / training_data_filename
@@ -133,48 +174,86 @@ class Classifier(object):
                 training_data_filepath.touch()
                 logger.info(f"Created training file {training_data_filename} exists")
 
-        # prompt user for signal for each gesture
-        logger.info("Perform each gesture 3 times")
-        for gesture_num in range(NUM_GESTURES):
-            # determine filepath of gesture training data
-            training_data_filename = Path(f'training_gesture_{gesture_num}.dat')
-            gesture_data_filepath = training_data_dir / training_data_filename
+        # determine if we use existing training data or get new training data
+        if not USE_EXISTING_DATA:
+            # prompt user for signal for each gesture
+            logger.info("Perform each gesture 3 times")
+            for gesture_num in range(NUM_GESTURES):
+                # determine filepath of gesture training data
+                training_data_filename = Path(f'training_gesture_{gesture_num}.dat')
+                gesture_data_filepath = training_data_dir / training_data_filename
 
-            # determine gesture to perform
-            gesture = GESTURE_NAMES[gesture_num]
+                # determine gesture to perform
+                gesture = GESTURE_NAMES[gesture_num]
 
-            # collect EMG samples for gesture
-            for sample_num in range(1, NUM_SAMPLES + 1):
-                logger.info(f"Perform gesture: {gesture} - sample {sample_num}")
-                while True:
-                    collect_data(gesture, gesture_data_filepath)
-                    break
-            logger.info(f"Collected samples for gesture: {gesture}\n")
+                # collect EMG samples for gesture
+                for sample_num in range(1, NUM_SAMPLES + 1):
+                    logger.info(f"Perform gesture: {gesture} - sample {sample_num}")
+                    while True:
+                        collect_data(gesture, gesture_data_filepath)
+                        break
+                logger.info(f"Collected samples for gesture: {gesture}\n")
 
-        # process and clean signal
-        for gesture_num in range(NUM_GESTURES):
-            # determine filepath of gesture training data
-            training_data_filename = Path(f'training_gesture_{gesture_num}.dat')
-            gesture_data_filepath = training_data_dir / training_data_filename
+            # process and clean signal
+            for gesture_num in range(NUM_GESTURES):
+                # determine filepath of gesture training data
+                training_data_filename = Path(f'training_gesture_{gesture_num}.dat')
+                gesture_data_filepath = training_data_dir / training_data_filename
 
-            # determine gesture to perform
-            gesture = GESTURE_NAMES[gesture_num]
+                # determine gesture to perform
+                gesture = GESTURE_NAMES[gesture_num]
 
-            # read training data file for gesture
-            emg_df = pd.read_csv(gesture_data_filepath, index_col=0)
-            logger.info(f"Read in training data for gesture: {gesture}\n")
+                # read training data file for gesture
+                emg_df = pd.read_csv(gesture_data_filepath)
 
-            # process signals
-            process_signal(emg_df)
+                # process signals
+                process_signal(emg_df)
+                logger.info(f"Processed training data for gesture: {gesture}")
 
-            # save process signal to dat file
-            emg_df.to_csv(gesture_data_filepath, index=False)
+                # save process signal to dat file
+                emg_df.to_csv(gesture_data_filepath, index=False)
 
+        # get training data for model
+        training_data, training_labels = get_training_data()
 
-        # for i in range(10):
-        #     with open('data/vals%d.dat' % i, 'ab') as f:
-        #         pass
-        # self.read_data()
+        # TODO calculate features?
+
+        # split data into train and test datasets
+        x_train, x_test, y_train, y_test = train_test_split(training_data, training_labels, shuffle=True, test_size=0.3, random_state=0)
+
+        # perform dimensionality reduction
+        logger.info("Performing dimensionality reduction")
+        lda = LinearDiscriminantAnalysis()
+        x_train = lda.fit_transform(x_train, y_train)
+        x_test = lda.transform(x_test)
+
+        # train SVM model using training data - TODO use my own model if this works ok
+        logger.info("Training model")
+
+        # classifier = svm.SVC(kernel='rbf')
+        classifier = RandomForestClassifier(n_estimators=3, random_state=0)
+
+        classifier.fit(x_train, y_train)
+        save_model(classifier)
+
+        # run baseline predictions
+        logger.info("Running predictions with trained model")
+        y_pred = classifier.predict(x_test)
+
+        classifier_accuracy = metrics.accuracy_score(y_test, y_pred) * 100
+        classifier_precision = metrics.precision_score(y_test, y_pred, average='micro')
+        classifier_recall = metrics.recall_score(y_test, y_pred, average='micro')
+        classifier_f1 = metrics.f1_score(y_test, y_pred, average='micro')
+
+        logger.info("+======================+")
+        logger.info("| SVM baseline metrics |")
+        logger.info("+----------------------+")
+        logger.info(f"| Accuracy: {classifier_accuracy:.3f}%")
+        logger.info(f"| Precision: {classifier_precision:.3f}")
+        logger.info(f"| Recall: {classifier_recall:.3f}")
+        logger.info(f"| F1 Score: {classifier_f1:.3f}")
+        logger.info("+======================+")
+
 
     def prompt_training_data(self):
         pass
