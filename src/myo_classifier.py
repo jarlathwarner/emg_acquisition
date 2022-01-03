@@ -33,8 +33,8 @@ COLOUR_GREEN = (0, 200, 0)
 NUM_GESTURES = 5
 NUM_SAMPLES = 3
 
-OVERWRITE_EXISTING = False
 USE_EXISTING_DATA = True
+# USE_EXISTING_DATA = False
 SAMPLE_RATE = 200
 
 GESTURE_NAMES = ['REST', 'FIST', 'EXTENDED PALM', 'WRIST FLEXION', 'WRIST EXTENSION']
@@ -92,7 +92,7 @@ def collect_data(gesture, training_data_filepath):
     # Vibrate MYO device to know it connected
     myo_sensor.vibrate(1)
 
-    logger.info(f"--- Collecting EMG data for gesture {gesture} ---")
+    logger.info(f"Collecting EMG data for gesture {gesture}")
 
     # Start collecting data.
     start_time = time.time()
@@ -104,8 +104,7 @@ def collect_data(gesture, training_data_filepath):
         else:
             collect_emg = False
             end_time = time.time() - start_time
-            logger.info(f"--- Finished collecting EMG data for gesture {gesture} ---")
-            logger.info(f"{len(myo_data)} frames collected in {end_time} seconds")
+            logger.info(f"Finished collecting EMG data for gesture {gesture}")
 
             # create dataframe to store EMG signals
             emg_df = pd.DataFrame(myo_data)
@@ -166,7 +165,7 @@ class Classifier(object):
                 logger.info(f"Training file {training_data_filename} exists")
 
                 # if file exists clear contents
-                if OVERWRITE_EXISTING:
+                if not USE_EXISTING_DATA:
                     training_data_filepath.unlink()
                     training_data_filepath.touch()
             else:
@@ -177,7 +176,7 @@ class Classifier(object):
         # determine if we use existing training data or get new training data
         if not USE_EXISTING_DATA:
             # prompt user for signal for each gesture
-            logger.info("Perform each gesture 3 times")
+            logger.info("--- Perform each gesture 3 times ---")
             for gesture_num in range(NUM_GESTURES):
                 # determine filepath of gesture training data
                 training_data_filename = Path(f'training_gesture_{gesture_num}.dat')
@@ -193,6 +192,7 @@ class Classifier(object):
                         collect_data(gesture, gesture_data_filepath)
                         break
                 logger.info(f"Collected samples for gesture: {gesture}\n")
+                logger.info(f"--- Get ready to perform next gesture ---")
 
             # process and clean signal
             for gesture_num in range(NUM_GESTURES):
@@ -204,7 +204,7 @@ class Classifier(object):
                 gesture = GESTURE_NAMES[gesture_num]
 
                 # read training data file for gesture
-                emg_df = pd.read_csv(gesture_data_filepath)
+                emg_df = pd.read_csv(gesture_data_filepath, on_bad_lines='skip')
 
                 # process signals
                 process_signal(emg_df)
