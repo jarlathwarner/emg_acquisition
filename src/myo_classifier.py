@@ -33,6 +33,11 @@ COLOUR_GREEN = (0, 200, 0)
 NUM_GESTURES = 5
 NUM_SAMPLES = 3
 
+SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
+FONT_SIZE = 30
+PLOT_COLOUR = (255, 255, 255)
+BACKGROUND_COLOUR = (0, 0, 0)
+
 USE_EXISTING_DATA = True
 # USE_EXISTING_DATA = False
 SAMPLE_RATE = 200
@@ -359,7 +364,7 @@ class MyoClassifier(Myo):
             h(pose)
 
     def run_gui(self, hnd, scr, font, w, h):
-        # Handle keypresses
+        # Handle key presses
         for ev in pygame.event.get():
             if ev.type == QUIT or (ev.type == KEYDOWN and ev.unicode == 'q'):
                 raise KeyboardInterrupt()
@@ -388,17 +393,16 @@ class MyoClassifier(Myo):
             x = 0
             y = 0 + 30 * i
 
-            # Set the barplot color
-            clr = self.cls.color if i == r else (255, 255, 255)
-
-            txt = font.render('%5d' % (self.cls.Y == i).sum(), True, (255, 255, 255))
+            # Set the bar plot color
+            clr = self.cls.color if i == r else PLOT_COLOUR
+            txt = font.render('%5d' % (self.cls.Y == i).sum(), True, PLOT_COLOUR)
             scr.blit(txt, (x + 20, y))
 
             txt = font.render('%d' % i, True, clr)
             scr.blit(txt, (x + 110, y))
 
             # Plot the barchart plot
-            scr.fill((0, 0, 0), (x + 130, y + txt.get_height() / 2 - 10, len(self.history) * 20, 20))
+            scr.fill(BACKGROUND_COLOUR, (x + 130, y + txt.get_height() / 2 - 10, len(self.history) * 20, 20))
             scr.fill(clr, (x + 130, y + txt.get_height() / 2 - 10, self.history_cnt[i] * 20, 20))
 
         pygame.display.flip()
@@ -451,33 +455,31 @@ class Live_Classifier(Classifier):
 
 
 if __name__ == '__main__':
-    # pygame.init()
-    # w, h = 800, 320
-    # scr = pygame.display.set_mode((w, h))
-    # font = pygame.font.Font(None, 30)
-    #
-    # m = MyoClassifier(Classifier())
-    # hnd = EMGHandler(m)
-    # m.add_emg_handler(hnd)
-    # m.connect()
-    #
-    # m.add_raw_pose_handler(print)
-    #
-    # # Set Myo LED color to model color
-    # m.set_leds(m.cls.color, m.cls.color)
-    #
-    # # Set pygame window name
-    # pygame.display.set_caption(m.cls.name)
-    #
-    # try:
-    #     while True:
-    #         m.run()
-    #         m.run_gui(hnd, scr, font, w, h)
-    #
-    # except KeyboardInterrupt:
-    #     pass
-    # finally:
-    #     m.disconnect()
-    #     print()
-    #     pygame.quit()
-    m = MyoClassifier(Classifier())
+    myo_device = MyoClassifier(Classifier())
+    myo_handler = EMGHandler(myo_device)
+
+    myo_device.add_emg_handler(myo_handler)
+    myo_device.connect()
+    myo_device.add_raw_pose_handler(print)
+
+    # set MYO LED colour to model colour
+    led_colour = (100, 0, 100)
+    myo_device.set_leds(led_colour, led_colour)
+
+    # pygame setup
+    pygame.init()
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    font = pygame.font.Font(None, FONT_SIZE)
+    pygame.display.set_caption("Live Predictions")
+
+    try:
+        while True:
+            myo_device.run()
+            myo_device.run_gui(myo_handler, screen, font, SCREEN_WIDTH, SCREEN_HEIGHT)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        myo_device.disconnect()
+        myo_device.power_off()
+        pygame.quit()
+        logger.info("Exited live predictions display")
