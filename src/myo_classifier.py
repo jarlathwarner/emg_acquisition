@@ -162,7 +162,7 @@ def get_training_data():
         gesture_data_filepath = training_data_dir / training_data_filename
 
         # read training data file for gesture
-        emg_df = pd.read_csv(gesture_data_filepath, index_col=0)
+        emg_df = pd.read_csv(gesture_data_filepath)
         emg_array = emg_df.to_numpy()
         emg_labels = np.full((len(emg_array)), gesture_num)
 
@@ -262,10 +262,17 @@ class Classifier(object):
         lda = LinearDiscriminantAnalysis()
         x_train = lda.fit_transform(x_train, y_train)
         x_test = lda.transform(x_test)
+        self.lda = lda
+
+        self.X = x_train
+        self.Y = y_train
+        self.X_test = x_test
+        self.Y_test = y_test
 
         # train SVM model using training data - TODO use my own model if this works ok
         logger.info("Training model")
         classifier = train_model(x_train, y_train)
+        self.classifier = classifier
 
         # run baseline predictions
         logger.info("Running predictions with trained model")
@@ -288,8 +295,17 @@ class Classifier(object):
     def save_model(self):
         pass
 
-    def run_predictions(self):
-        pass
+    def run_predictions(self, emg_data):
+        # TODO perform some sort of validation here
+        emg_data_array = np.asarray(emg_data)
+        reshaped_emg_data = emg_data_array.reshape(1, -1)
+        emg_data_final = self.lda.transform(reshaped_emg_data)
+
+        logger.info(f"EMG data received: {emg_data}")
+        logger.info(f"EMG data received (numpy): {emg_data_array}")
+        logger.info(f"Shape of data: {emg_data_array.shape}")
+        logger.info(f"Reshaped data: {emg_data_final.shape}")
+        return self.classifier.predict(emg_data_final)
 
     """
     old code
@@ -346,8 +362,13 @@ class MyoClassifier(Myo):
         self.pose_handlers = []
 
     def emg_handler(self, emg, moving):
-        y = self.cls.classify(emg)
+        # y = self.cls.classify(emg)
+        y = self.cls.run_predictions(emg)
+
         self.history_cnt[self.history[0]] -= 1
+        
+        # TODO is this line right?
+        y = y[0]
         self.history_cnt[y] += 1
         self.history.append(y)
 
