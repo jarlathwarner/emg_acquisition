@@ -33,8 +33,8 @@ COLOUR_GREEN = (0, 200, 0)
 NUM_GESTURES = 5
 NUM_SAMPLES = 3
 
-SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
-FONT_SIZE = 30
+SCREEN_WIDTH, SCREEN_HEIGHT = 800, 300
+FONT_SIZE = 25
 PLOT_COLOUR = (255, 255, 255)
 BACKGROUND_COLOUR = (0, 0, 0)
 
@@ -368,21 +368,27 @@ class MyoClassifier(Myo):
         scr.fill((0, 0, 0), (0, 0, w, h))
         r = self.history_cnt.most_common(1)[0][0]
 
-        for i in range(10):
+        space_between_plots = 50
+        for i in range(NUM_GESTURES):
             x = 0
-            y = 0 + 30 * i
+            y = 0 + space_between_plots * i
 
-            # Set the bar plot color
+            # Plot the text labelling the gestures
             clr = self.cls.color if i == r else PLOT_COLOUR
-            txt = font.render('%5d' % (self.cls.Y == i).sum(), True, PLOT_COLOUR)
-            scr.blit(txt, (x + 20, y))
+            gesture_text = GESTURE_NAMES[i]
+            txt = font.render(gesture_text, True, clr)
+            scr.blit(txt, (x, y))
 
-            txt = font.render('%d' % i, True, clr)
-            scr.blit(txt, (x + 110, y))
+            # determine chart values
+            barchart_x = x + 200
+            barchart_y = y + txt.get_height() / 2 - 10
+            barchart_width = len(self.history) * 20
+            barchart_height = 20
+            dynamic_chart_width = self.history_cnt[i] * 20
 
-            # Plot the barchart plot
-            scr.fill(BACKGROUND_COLOUR, (x + 130, y + txt.get_height() / 2 - 10, len(self.history) * 20, 20))
-            scr.fill(clr, (x + 130, y + txt.get_height() / 2 - 10, self.history_cnt[i] * 20, 20))
+            # Plot the dynamic barchart
+            scr.fill(BACKGROUND_COLOUR, (barchart_x, barchart_y, barchart_width, barchart_height))
+            scr.fill(clr, (barchart_x, barchart_y, dynamic_chart_width, barchart_height))
 
         pygame.display.flip()
 
