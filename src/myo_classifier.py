@@ -301,48 +301,7 @@ class Classifier(object):
         reshaped_emg_data = emg_data_array.reshape(1, -1)
         emg_data_final = self.lda.transform(reshaped_emg_data)
 
-        logger.info(f"EMG data received: {emg_data}")
-        logger.info(f"EMG data received (numpy): {emg_data_array}")
-        logger.info(f"Shape of data: {emg_data_array.shape}")
-        logger.info(f"Reshaped data: {emg_data_final.shape}")
         return self.classifier.predict(emg_data_final)
-
-    """
-    old code
-    """
-    def store_data(self, cls, vals):
-        with open('data/vals%d.dat' % cls, 'ab') as f:
-            f.write(pack('8H', *vals))
-
-        self.train(np.vstack([self.X, vals]), np.hstack([self.Y, [cls]]))
-
-    def read_data(self):
-        X = []
-        Y = []
-        for i in range(10):
-            X.append(np.fromfile('data/vals%d.dat' % i, dtype=np.uint16).reshape((-1, 8)))
-            Y.append(i + np.zeros(X[-1].shape[0]))
-
-        self.train(np.vstack(X), np.hstack(Y))
-
-    def delete_data(self):
-        for i in range(10):
-            with open('data/vals%d.dat' % i, 'wb') as f: pass
-        self.read_data()
-
-    def train(self, X, Y):
-        self.X = X
-        self.Y = Y
-        self.model = None
-
-    def nearest(self, d):
-        dists = ((self.X - d) ** 2).sum(1)
-        ind = dists.argmin()
-        return self.Y[ind]
-
-    def classify(self, d):
-        if self.X.shape[0] < K * SUBSAMPLE: return 0
-        return self.nearest(d)
 
 
 class MyoClassifier(Myo):
@@ -362,11 +321,10 @@ class MyoClassifier(Myo):
         self.pose_handlers = []
 
     def emg_handler(self, emg, moving):
-        # y = self.cls.classify(emg)
         y = self.cls.run_predictions(emg)
 
         self.history_cnt[self.history[0]] -= 1
-        
+
         # TODO is this line right?
         y = y[0]
         self.history_cnt[y] += 1
