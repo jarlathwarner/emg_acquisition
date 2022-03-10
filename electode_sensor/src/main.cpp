@@ -35,6 +35,7 @@
 #include "WProgram.h"
 #endif
 
+#include "Plotter.h"
 #include "EMGFilters.h"
 
 #define TIMING_DEBUG 2
@@ -61,6 +62,9 @@ static int Threshold = 0;
 
 unsigned long timeStamp;
 unsigned long timeBudget;
+
+double x;
+Plotter p;
 
 void setup() 
 {
