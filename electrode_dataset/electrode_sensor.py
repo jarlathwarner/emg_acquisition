@@ -19,8 +19,6 @@ class ElectrodeSensors:
 
         while True:
             elapsed_time = time.time() - start_time
-            print(f"Hold for {3 - int(elapsed_time)} seconds...")
-
             if elapsed_time > GESTURE_DURATION_SECONDS:
                 print(f"| Elapsed time: {elapsed_time} seconds")
                 print("+--- Finished recording ---\n")
@@ -49,10 +47,12 @@ class ElectrodeSensors:
 
     def get_dataset_array(self):
         # convert data to numpy array
-        max_len = len(max(self.sensor_data, key=len))
-        adjusted_data = [x + [0] * (max_len - len(x)) for x in self.sensor_data]
-        sensor_data_matrix = np.array(adjusted_data)
-        return sensor_data_matrix
+        sensor_data_array = self.get_sensor_data_array()
+        label_array = np.array(self.sensor_labels)
+
+        # append labels to sensor data
+        dataset_matrix = np.column_stack((sensor_data_array, label_array))
+        return dataset_matrix
 
     def reset_data(self):
         # convert data to numpy array
