@@ -3,24 +3,27 @@ import time
 import numpy as np
 import serial
 
+from constants import GESTURE_DURATION_SECONDS
+
 class ElectrodeSensors:
     def __init__(self):
-        time.sleep(2)
-
         self.sensor_data = []
+        self.sensor_labels = []
+        time.sleep(1)
 
-    def record_data(self):
+    def record_data(self, label):
         ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
 
-        print("--- Starting recording ---")
+        print("+--- Starting recording ---")
         start_time = time.time()
 
         while True:
             elapsed_time = time.time() - start_time
+            print(f"Hold for {3 - int(elapsed_time)} seconds...")
 
-            if elapsed_time > 3:
-                print(f"Elapsed time: {elapsed_time} seconds")
-                print("--- Finished recording ---")
+            if elapsed_time > GESTURE_DURATION_SECONDS:
+                print(f"| Elapsed time: {elapsed_time} seconds")
+                print("+--- Finished recording ---\n")
                 break
 
             byte_data = ser.readline()
@@ -32,13 +35,26 @@ class ElectrodeSensors:
             if len(split_data) > 0 and split_data != ['']:
                 numeric_data = list(map(int, split_data))
                 self.sensor_data.append(numeric_data)
+                self.sensor_labels.append(label)
 
         # close serial connection
         ser.close()
 
-    def get_numpy_array(self):
+    def get_sensor_data_array(self):
         # convert data to numpy array
         max_len = len(max(self.sensor_data, key=len))
         adjusted_data = [x + [0] * (max_len - len(x)) for x in self.sensor_data]
         sensor_data_matrix = np.array(adjusted_data)
         return sensor_data_matrix
+
+    def get_dataset_array(self):
+        # convert data to numpy array
+        max_len = len(max(self.sensor_data, key=len))
+        adjusted_data = [x + [0] * (max_len - len(x)) for x in self.sensor_data]
+        sensor_data_matrix = np.array(adjusted_data)
+        return sensor_data_matrix
+
+    def reset_data(self):
+        # convert data to numpy array
+        self.sensor_data = []
+        self.sensor_labels = []
