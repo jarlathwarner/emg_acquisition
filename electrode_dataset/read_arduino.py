@@ -2,7 +2,6 @@ import time
 
 import numpy as np
 import serial
-
 # open serial connection
 from matplotlib import pyplot as plt
 

@@ -1,6 +1,3 @@
-import time
-from random import randrange
-
 import numpy as np
 import pygame
 from matplotlib import pyplot as plt
