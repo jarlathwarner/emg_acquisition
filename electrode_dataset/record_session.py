@@ -134,4 +134,5 @@ while not done:
 
     # draw surface object to screen
     pygame.display.update()
+    pygame.display.flip()
 
