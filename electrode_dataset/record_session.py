@@ -37,10 +37,10 @@ title_text_rect = title_text.get_rect()
 title_text_rect.center = (screen_x // 2, 50)
 
 changing_text_rect = changing_text.get_rect()
-changing_text_rect.center = (screen_x // 4, screen_y // 2)
+changing_text_rect.topleft = ((screen_x // 2) - (screen_x / 2) + 25, screen_y // 2)
 
 gesture_text_rect = gesture_text.get_rect()
-gesture_text_rect.center = (screen_x // 4, screen_y // 4)
+gesture_text_rect.topleft = ((screen_x // 2) - (screen_x / 2) + 25, (screen_y // 2) - 50)
 
 # recording variables
 done = False
