@@ -4,12 +4,13 @@ import numpy as np
 import serial
 
 from constants import GESTURE_DURATION_SECONDS
+from constants import SAMPLE_RATE
 
 class ElectrodeSensors:
     def __init__(self):
         self.sensor_data = []
         self.sensor_labels = []
-        time.sleep(1)
+        self.sample_duration = 1 / SAMPLE_RATE
 
     def record_data(self, label):
         ser = serial.Serial('/dev/ttyACM0', 115200, timeout=1)
@@ -24,6 +25,7 @@ class ElectrodeSensors:
                 print("+--- Finished recording ---\n")
                 break
 
+            start_recording_time = time.time()
             byte_data = ser.readline()
             decoded_data = byte_data.decode('UTF-8', errors='ignore')
             stripped_data = decoded_data.strip()
@@ -34,6 +36,11 @@ class ElectrodeSensors:
                 numeric_data = list(map(int, split_data))
                 self.sensor_data.append(numeric_data)
                 self.sensor_labels.append(label)
+
+            # control sample rate
+            elapsed_recording_time = time.time() - start_recording_time
+            if elapsed_recording_time < self.sample_duration:
+                time.sleep(self.sample_duration - elapsed_recording_time)
 
         # close serial connection
         ser.close()
