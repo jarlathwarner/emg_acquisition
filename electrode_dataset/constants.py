@@ -7,3 +7,5 @@ DATA_FILEPATH.mkdir(exist_ok=True)
 # recording constants
 NUM_GESTURE_RECORDINGS = 3
 GESTURE_DURATION_SECONDS = 3
+
+SAMPLE_RATE = 500
