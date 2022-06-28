@@ -4,8 +4,16 @@ from pathlib import Path
 DATA_FILEPATH = Path('data')
 DATA_FILEPATH.mkdir(exist_ok=True)
 
-# recording constants
-NUM_GESTURE_RECORDINGS = 5
-GESTURE_DURATION_SECONDS = 5
+CONFIG_FILEPATH = Path('config.json')
 
+# EMG signal constants
 SAMPLE_RATE = 500
+
+# gesture constants
+GESTURES_TO_PERFORM = ['Fist', 'Extended Palm']
+# add 1 to number for rest gesture
+NUM_GESTURES = len(GESTURES_TO_PERFORM) + 1
+
+# recording constants
+NUM_GESTURE_RECORDINGS = 3
+GESTURE_DURATION_SECONDS = 3

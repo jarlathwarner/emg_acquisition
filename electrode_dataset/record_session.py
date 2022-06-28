@@ -1,10 +1,9 @@
-import numpy as np
 import pygame
 from matplotlib import pyplot as plt
 
-from constants import DATA_FILEPATH
 from constants import NUM_GESTURE_RECORDINGS
-from constants import SAMPLE_RATE
+from electrode_dataset.constants import GESTURES_TO_PERFORM
+from electrode_dataset.dataset_config import DatasetManager
 from electrode_sensor import ElectrodeSensors
 
 pygame.init()
@@ -15,6 +14,7 @@ grey = (184, 184, 184)
 blue = (0, 0, 128)
 green = (13, 175, 19)
 red = (219, 26, 46)
+orange = (235, 125, 15)
 
 # window variables
 screen_x = 1000
@@ -30,15 +30,19 @@ start_ticks = pygame.time.get_ticks()
 
 # text variables
 title_text = font.render('EMG recording session', True, blue)
-changing_text = font.render(f"Seconds: ---", True, green)
+gesture_changing_text = font.render(f"---", True, green)
 gesture_text = font.render(f"Gestures to perform: []", True, red)
+repetition_text = font.render(f"---", True, orange)
 
 # position variables
 title_text_rect = title_text.get_rect()
 title_text_rect.center = (screen_x // 2, 50)
 
-changing_text_rect = changing_text.get_rect()
-changing_text_rect.topleft = ((screen_x // 2) - (screen_x / 2) + 25, screen_y // 2)
+repetition_text_rect = repetition_text.get_rect()
+repetition_text_rect.topleft = ((screen_x // 2) - (screen_x / 2) + 25, (screen_y // 2) - 100)
+
+gesture_changing_text_rect = gesture_changing_text.get_rect()
+gesture_changing_text_rect.topleft = ((screen_x // 2) - (screen_x / 2) + 25, screen_y // 2)
 
 gesture_text_rect = gesture_text.get_rect()
 gesture_text_rect.topleft = ((screen_x // 2) - (screen_x / 2) + 25, (screen_y // 2) - 50)
@@ -46,18 +50,17 @@ gesture_text_rect.topleft = ((screen_x // 2) - (screen_x / 2) + 25, (screen_y //
 # recording variables
 record_rest = True
 num_recording_repetitions = 3
-all_gestures_recorded = False
+recording_finished = False
 done = False
 
 gesture_idx = 0
 gesture_recording_num = 1
 repetition_id = 0
-gestures_to_perform = ['Fist', 'Extended Palm']
-gestures_remaining = gestures_to_perform.copy()
-num_gestures = len(gestures_to_perform) + 1
+gestures_remaining = GESTURES_TO_PERFORM.copy()
 
 # electrode sensor variables
 electrode_sensor = ElectrodeSensors()
+dataset_manager = DatasetManager()
 
 while not done:
     # display the elapsed time
@@ -66,7 +69,7 @@ while not done:
 
     # update the text for which gestures are remaining
     gesture_text = font.render(f"Gestures remaining to perform: {gestures_remaining}", True, red)
-    repetition_id_text = font.render(f"Recording repetition: {repetition_id + 1}", True, red)
+    repetition_text = font.render(f"Recording repetition: {repetition_id + 1}", True, orange)
 
     ###
     # recording code
@@ -74,15 +77,17 @@ while not done:
     if repetition_id < num_recording_repetitions:
         # check whether to record gesture or relax
         if record_rest:
-            changing_text = font.render(f"Relax your arm", True, green)
+            gesture_changing_text = font.render(f"Relax your arm", True, green)
 
             electrode_sensor.record_data(0)
             record_rest = False
         else:
-            # get name of the gesture to perform
-            gesture = gestures_to_perform[gesture_idx]
-            text_string = f"Recording #{gesture_recording_num}/{NUM_GESTURE_RECORDINGS} - Perform {gesture} and hold"
-            changing_text = font.render(text_string, True, green)
+            # get name of the next gesture to perform
+            gesture = GESTURES_TO_PERFORM[gesture_idx]
+
+            # print text on screen
+            gesture_text_string = f"Recording #{gesture_recording_num}/{NUM_GESTURE_RECORDINGS} - Perform {gesture} and hold"
+            gesture_changing_text = font.render(gesture_text_string, True, green)
 
             # get recording
             electrode_sensor.record_data(gesture_idx + 1)
@@ -99,41 +104,42 @@ while not done:
 
         # check if we have got all recordings for all gestures
         if len(gestures_remaining) == 0:
-            all_gestures_recorded = True
-
+            gesture_idx = 0
             repetition_id += 1
             if repetition_id < num_recording_repetitions:
-                gestures_remaining = gestures_to_perform.copy()
+                gestures_remaining = GESTURES_TO_PERFORM.copy()
+                record_rest = True
 
             # reset starting time
             elapsed_time = int((pygame.time.get_ticks() - start_ticks) / 1000)
+    else:
+        # get numpy array of recorded data
+        sensor_data_matrix = electrode_sensor.get_sensor_data_array()
+        dataset_matrix = electrode_sensor.get_dataset_array()
+        electrode_sensor.reset_data()
 
-            # get numpy array of recorded data
-            sensor_data_matrix = electrode_sensor.get_sensor_data_array()
-            dataset_matrix = electrode_sensor.get_dataset_array()
-            electrode_sensor.reset_data()
+        # plot the data
+        plt.plot(sensor_data_matrix)
+        plt.xlabel(f'Time - {elapsed_time}seconds')
+        plt.ylabel('Sensor readings')
+        plt.title('Sensor readings vs Time')
+        plt.show()
 
-            # plot the data
-            plt.plot(sensor_data_matrix)
-            plt.xlabel(f'Time - {elapsed_time}seconds')
-            plt.ylabel('Sensor readings')
-            plt.title('Sensor readings vs Time')
-            plt.show()
-
-            # save data to file
-            matrix_filepath = DATA_FILEPATH.absolute() / f'dataset_{SAMPLE_RATE}_{num_gestures}_gestures.npy'
-            np.save(matrix_filepath, dataset_matrix)
+        # save data to file
+        dataset_manager.save_data(dataset_matrix)
+        recording_finished = True
 
     # fill the screen with white colour
     screen.fill(grey)
 
     # copy text to display rectangles
     screen.blit(title_text, title_text_rect)
-    screen.blit(changing_text, changing_text_rect)
+    screen.blit(gesture_changing_text, gesture_changing_text_rect)
+    screen.blit(repetition_text, repetition_text_rect)
     screen.blit(gesture_text, gesture_text_rect)
 
-    # check if all gestures have been recorded
-    if all_gestures_recorded:
+    # check if recording is done
+    if recording_finished:
         done = True
 
     # keep checking if quit event has been entered
@@ -144,4 +150,5 @@ while not done:
     # draw surface object to screen
     pygame.display.update()
     pygame.display.flip()
-
+print("Quitting recording")
+pygame.display.quit()
