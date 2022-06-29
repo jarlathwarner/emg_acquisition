@@ -3,6 +3,9 @@ from matplotlib import pyplot as plt
 
 from constants import NUM_GESTURE_RECORDINGS
 from electrode_dataset.constants import GESTURES_TO_PERFORM
+from electrode_dataset.constants import NUM_GESTURES
+from electrode_dataset.constants import NUM_RECORDING_REPETITIONS
+from electrode_dataset.constants import SAMPLE_RATE
 from electrode_dataset.dataset_config import DatasetManager
 from electrode_sensor import ElectrodeSensors
 
@@ -49,7 +52,6 @@ gesture_text_rect.topleft = ((screen_x // 2) - (screen_x / 2) + 25, (screen_y //
 
 # recording variables
 record_rest = True
-num_recording_repetitions = 3
 recording_finished = False
 done = False
 
@@ -74,7 +76,7 @@ while not done:
     ###
     # recording code
     ###
-    if repetition_id < num_recording_repetitions:
+    if repetition_id < NUM_RECORDING_REPETITIONS:
         # check whether to record gesture or relax
         if record_rest:
             gesture_changing_text = font.render(f"Relax your arm", True, green)
@@ -106,7 +108,7 @@ while not done:
         if len(gestures_remaining) == 0:
             gesture_idx = 0
             repetition_id += 1
-            if repetition_id < num_recording_repetitions:
+            if repetition_id < NUM_RECORDING_REPETITIONS:
                 gestures_remaining = GESTURES_TO_PERFORM.copy()
                 record_rest = True
 
@@ -119,10 +121,18 @@ while not done:
         electrode_sensor.reset_data()
 
         # plot the data
-        plt.plot(sensor_data_matrix)
-        plt.xlabel(f'Time - {elapsed_time}seconds')
+        fig, axes = plt.subplots(nrows=3, ncols=1, sharex=True)
+        plt.subplot(3, 1, 1)
+        plt.plot(sensor_data_matrix[:, 0])
+
+        plt.subplot(3, 1, 2)
+        plt.plot(sensor_data_matrix[:, 1])
+
+        plt.subplot(3, 1, 3)
+        plt.plot(sensor_data_matrix[:, 2])
+
         plt.ylabel('Sensor readings')
-        plt.title('Sensor readings vs Time')
+        plt.suptitle(f'Sensor readings - {NUM_GESTURES} gestures - {SAMPLE_RATE} sample rate')
         plt.show()
 
         # save data to file

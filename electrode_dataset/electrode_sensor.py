@@ -32,7 +32,7 @@ class ElectrodeSensors:
             split_data = stripped_data.split(' ')
 
             # verify data is valid
-            if len(split_data) > 0 and split_data != ['']:
+            if len(split_data) > 0 and split_data != [''] and '-' not in split_data:
                 numeric_data = list(map(int, split_data))
                 self.sensor_data.append(numeric_data)
                 self.sensor_labels.append(label)
